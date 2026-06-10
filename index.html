@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Port Scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0d1117;--bg2:#161b22;--bg3:#1c2330;--border:#30363d;--border2:#21262d;
+      --text:#e6edf3;--muted:#8b949e;--green:#3fb950;--green-dim:#1a3a22;
+      --red:#f85149;--red-dim:#3d1a1a;--blue:#58a6ff;--amber:#d29922;--cyan:#39d353;
+      --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;--radius:8px;
+    }
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;}
+    header{border-bottom:1px solid var(--border);padding:1.25rem 2rem;display:flex;align-items:center;gap:1rem;}
+    .logo{font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--cyan);}
+    .logo span{color:var(--muted);font-weight:400;}
+    .badge{font-size:11px;font-family:var(--mono);background:var(--green-dim);color:var(--green);border:1px solid #2ea04326;padding:2px 8px;border-radius:20px;}
+    main{flex:1;display:grid;grid-template-columns:360px 1fr;}
+    aside{border-right:1px solid var(--border);padding:1.5rem;display:flex;flex-direction:column;gap:1.25rem;}
+    .section-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem;}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px;}
+    input[type="text"]{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 12px;border-radius:var(--radius);outline:none;}
+    input[type="text"]:focus{border-color:var(--blue);}
+    .port-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+    .preset-btn{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:5px 4px;border-radius:6px;cursor:pointer;text-align:center;}
+    .preset-btn:hover{border-color:var(--blue);color:var(--blue);}
+    .preset-btn.active{border-color:var(--blue);color:var(--blue);background:#1a2740;}
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text);}
+    .toggle{position:relative;width:36px;height:20px;}
+    .toggle input{display:none;}
+    .toggle-track{position:absolute;inset:0;background:var(--bg3);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:background .2s;}
+    .toggle input:checked+.toggle-track{background:var(--green);border-color:var(--green);}
+    .toggle-thumb{position:absolute;top:3px;left:3px;width:12px;height:12px;background:var(--muted);border-radius:50%;transition:transform .2s;pointer-events:none;}
+    .toggle input:checked~.toggle-thumb{transform:translateX(16px);background:#fff;}
+    .range-row{display:flex;align-items:center;gap:10px;}
+    input[type="range"]{flex:1;-webkit-appearance:none;height:4px;background:var(--border);border-radius:4px;outline:none;}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--blue);border-radius:50%;cursor:pointer;}
+    .range-val{font-family:var(--mono);font-size:12px;color:var(--blue);min-width:32px;text-align:right;}
+    .scan-btn{width:100%;padding:10px;background:var(--green);color:#0d1117;border:none;border-radius:var(--radius);font-family:var(--mono);font-size:14px;font-weight:700;cursor:pointer;}
+    .scan-btn:hover{opacity:.9;}
+    .scan-btn:disabled{opacity:.4;cursor:not-allowed;}
+    .results-panel{display:flex;flex-direction:column;overflow:hidden;}
+    .results-toolbar{border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;gap:1rem;}
+    .status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+    .status-dot.scanning{background:var(--amber);animation:pulse 1s infinite;}
+    .status-dot.done{background:var(--green);}
+    .status-dot.error{background:var(--red);}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .status-text{font-family:var(--mono);font-size:12px;color:var(--muted);flex:1;}
+    .stat-pills{display:flex;gap:8px;}
+    .pill{font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted);}
+    .pill.open{background:var(--green-dim);color:var(--green);border-color:#2ea04326;}
+    .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;border-bottom:1px solid var(--border);background:var(--border);}
+    .stat-card{background:var(--bg);padding:1rem 1.25rem;}
+    .stat-card .num{font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px;}
+    .stat-card .num.green{color:var(--green);}
+    .stat-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+    .table-wrap{flex:1;overflow-y:auto;padding:1rem 1.5rem;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead th{text-align:left;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 12px 10px;border-bottom:1px solid var(--border2);}
+    tbody tr{border-bottom:1px solid var(--border2);cursor:pointer;}
+    tbody tr:hover{background:var(--bg2);}
+    tbody td{padding:10px 12px;font-family:var(--mono);font-size:12px;}
+    .td-port{color:var(--blue);font-weight:700;font-size:13px;}
+    .td-danger{color:#f85149;background:#3d1a1a;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;}
+    .td-warning{color:#d29922;background:#2a1f00;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;}
+    .td-safe{color:#3fb950;background:#1a3a22;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;}
+    .td-service{color:var(--text);}
+    .td-banner{color:var(--muted);font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .td-proto{font-size:11px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);padding:2px 8px;border-radius:4px;display:inline-block;}
+    .td-hint{font-size:11px;color:var(--blue);font-family:var(--mono);}
+    .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:var(--muted);padding:3rem;text-align:center;}
+    .empty-icon{font-size:3rem;opacity:.3;}
+    .empty-state p{font-size:13px;max-width:260px;line-height:1.6;}
+    .progress-bar-wrap{width:100%;max-width:320px;background:var(--bg3);border-radius:4px;overflow:hidden;height:4px;}
+    .progress-bar{height:100%;background:var(--cyan);border-radius:4px;transition:width .3s;width:0%;}
+    .log-line{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:4px;}
+    .log-line.safe{color:var(--green);}
+    .log-line.danger{color:#f85149;}
+    .log-line.warning{color:#d29922;}
+    .warning-bar{background:#2a1f00;border-top:1px solid #4a3800;padding:.6rem 1.5rem;font-size:11px;color:var(--amber);font-family:var(--mono);}
+    .export-btn{background:var(--bg3);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:6px;cursor:pointer;}
+    .export-btn:hover{border-color:var(--blue);color:var(--blue);}
+
+    /* ── Info panel ── */
+    .info-panel{border-top:1px solid var(--border);background:var(--bg2);padding:1.25rem 1.5rem;font-size:13px;display:none;}
+    .info-panel.visible{display:block;}
+    .info-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+    .info-port{font-family:var(--mono);font-size:1.2rem;font-weight:700;color:var(--blue);}
+    .info-service{font-family:var(--mono);font-size:13px;color:var(--muted);}
+    .info-close{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;}
+    .info-close:hover{color:var(--text);}
+    .info-what{margin-bottom:12px;line-height:1.7;color:var(--text);}
+    .info-fix{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+    .info-fix-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
+    .info-fix-label.danger{color:#f85149;}
+    .info-fix-label.warning{color:#d29922;}
+    .info-fix-label.safe{color:var(--green);}
+    .info-fix p{font-size:12px;color:var(--muted);line-height:1.7;}
+    .info-fix code{font-family:var(--mono);font-size:11px;background:var(--bg);border:1px solid var(--border);padding:6px 10px;border-radius:4px;display:block;margin-top:8px;color:var(--cyan);}
+
+    @media(max-width:700px){main{grid-template-columns:1fr;}aside{border-right:none;border-bottom:1px solid var(--border);}.summary-cards{grid-template-columns:repeat(2,1fr);}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">port<span>.</span>scanner</div>
+  <div class="badge">TCP</div>
+</header>
+<main>
+  <aside>
+    <div>
+      <div class="section-label">Target</div>
+      <label>Hostname or IP address</label>
+      <input type="text" id="host" value="scanme.nmap.org" placeholder="e.g. 192.168.1.1" spellcheck="false" />
+    </div>
+    <div>
+      <div class="section-label">Port range</div>
+      <div class="port-presets">
+        <button class="preset-btn active" data-ports="common">Common</button>
+        <button class="preset-btn" data-ports="top">Top 1024</button>
+        <button class="preset-btn" data-ports="web">Web</button>
+        <button class="preset-btn" data-ports="custom">Custom</button>
+      </div>
+      <input type="text" id="portInput" value="21,22,23,25,53,80,110,143,443,445,3306,3389,5432,8080,8443" spellcheck="false" />
+    </div>
+    <div>
+      <div class="section-label">Options</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="toggle-row">
+          <span>Grab banners</span>
+          <label class="toggle">
+            <input type="checkbox" id="banners" />
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+        <div>
+          <label>Timeout (seconds)</label>
+          <div class="range-row">
+            <input type="range" id="timeout" min="0.2" max="5" step="0.1" value="1.5" />
+            <span class="range-val" id="timeoutVal">1.5s</span>
+          </div>
+        </div>
+        <div>
+          <label>Threads</label>
+          <div class="range-row">
+            <input type="range" id="threads" min="10" max="300" step="10" value="100" />
+            <span class="range-val" id="threadsVal">100</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">▶ Start scan</button>
+  </aside>
+  <div class="results-panel">
+    <div class="results-toolbar">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="status-text" id="statusText">Ready — enter a host and press scan</div>
+      <div class="stat-pills" id="statPills"></div>
+      <button class="export-btn" id="exportBtn" onclick="exportCSV()" style="display:none">↓ Export CSV</button>
+    </div>
+    <div class="summary-cards" id="summaryCards" style="display:none;">
+      <div class="stat-card"><div class="num green" id="sc-open">0</div><div class="lbl">Open ports</div></div>
+      <div class="stat-card"><div class="num" id="sc-total">0</div><div class="lbl">Scanned</div></div>
+      <div class="stat-card"><div class="num" id="sc-time">—</div><div class="lbl">Seconds</div></div>
+      <div class="stat-card"><div class="num" id="sc-ip">—</div><div class="lbl">Resolved IP</div></div>
+    </div>
+    <div class="table-wrap" id="tableWrap">
+      <div class="empty-state">
+        <div class="empty-icon">⬡</div>
+        <p>No results yet. Configure your target on the left and press Start scan.</p>
+      </div>
+    </div>
+    <div class="info-panel" id="infoPanel">
+      <div class="info-header">
+        <span class="info-port" id="infoPort"></span>
+        <span class="info-service" id="infoService"></span>
+        <button class="info-close" onclick="closeInfo()">✕</button>
+      </div>
+      <p class="info-what" id="infoWhat"></p>
+      <div class="info-fix" id="infoFix"></div>
+    </div>
+    <div class="warning-bar">⚠ Only scan systems you own or have written permission to test. Unauthorized scanning may be illegal.</div>
+  </div>
+</main>
+<script>
+const DANGER_PORTS=[23,21,3389,4444,135,139,445];
+const WARNING_PORTS=[3306,5432,6379,27017,1433,1521,9200,11211];
+const PORT_PRESETS={common:"21,22,23,25,53,80,110,143,443,445,3306,3389,5432,8080,8443",top:"1-1024",web:"80,443,8080,8443,3000,4200,5000,8000,8888,9000",custom:""};
+
+const PORT_INFO={
+  21:{what:"FTP (File Transfer Protocol) — used to transfer files between computers. Very old protocol that sends data including passwords in plain text with no encryption.",fix:{risk:"danger",text:"FTP is outdated and insecure. Replace it with SFTP or FTPS which encrypt your data. If you don't need it, disable it.",cmd:"# Disable FTP on Windows:\nGet-WindowsFeature Web-Ftp-Server | Disable-WindowsOptionalFeature"}},
+  22:{what:"SSH (Secure Shell) — used to remotely log into a server securely. It encrypts all communication, making it one of the safer remote access protocols.",fix:{risk:"safe",text:"SSH is generally safe. Make sure you use strong passwords or better yet, SSH key authentication instead of passwords.",cmd:""}},
+  23:{what:"Telnet — a very old remote access protocol. It sends ALL data including your username and password completely unencrypted, meaning anyone on the network can read it.",fix:{risk:"danger",text:"Telnet is extremely dangerous. It should never be open on a public server. Disable it immediately and use SSH instead.",cmd:"# Disable Telnet on Windows:\nDism /Online /Disable-Feature /FeatureName:TelnetClient"}},
+  25:{what:"SMTP — used to send emails between mail servers. If open on a non-mail server, it could be used to send spam or phishing emails.",fix:{risk:"warning",text:"Only mail servers should have port 25 open. If this is not a mail server, block this port in your firewall.",cmd:""}},
+  53:{what:"DNS (Domain Name System) — translates domain names like google.com into IP addresses. Every device needs DNS to browse the internet.",fix:{risk:"safe",text:"DNS is normal if this is a DNS server or router. If it's a regular computer, it shouldn't be running a DNS server.",cmd:""}},
+  80:{what:"HTTP — the standard protocol for websites. All web traffic goes over this port. Data is sent unencrypted.",fix:{risk:"safe",text:"Port 80 is normal for web servers. Consider redirecting all HTTP traffic to HTTPS (port 443) for better security.",cmd:""}},
+  443:{what:"HTTPS — the secure version of HTTP. All data is encrypted with SSL/TLS. This is what you see when a website has a padlock icon.",fix:{risk:"safe",text:"HTTPS is the gold standard for web traffic. This is good — keep it open.",cmd:""}},
+  445:{what:"SMB (Server Message Block) — Windows file and printer sharing. This port was exploited by the famous WannaCry ransomware attack in 2017 which infected hundreds of thousands of computers worldwide.",fix:{risk:"danger",text:"SMB should never be exposed to the public internet. On your local PC it's normal, but block it in your firewall from external access.",cmd:"# Block SMB in Windows Firewall:\nnetsh advfirewall firewall add rule name='Block SMB' dir=in action=block protocol=TCP localport=445"}},
+  3306:{what:"MySQL — a popular database server. Databases contain your most sensitive data. If this port is open publicly, anyone can try to log in to your database.",fix:{risk:"warning",text:"MySQL should never be publicly accessible. Restrict it to localhost only (127.0.0.1) or use a VPN/SSH tunnel to access it remotely.",cmd:"# In MySQL config (my.cnf), set:\nbind-address = 127.0.0.1"}},
+  3389:{what:"RDP (Remote Desktop Protocol) — allows full remote control of a Windows computer. One of the most attacked ports on the internet. Thousands of brute force attacks happen every day.",fix:{risk:"danger",text:"RDP should never be open to the public internet. Use a VPN first, then RDP through the VPN. Or change the port from 3389 to something non-standard.",cmd:"# Disable RDP on Windows:\nSet-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -name fDenyTSConnections -Value 1"}},
+  5432:{what:"PostgreSQL — a powerful open source database. Like MySQL, having this port open publicly gives attackers a direct path to your data.",fix:{risk:"warning",text:"PostgreSQL should only be accessible locally or through a secure tunnel. Never expose it to the public internet.",cmd:"# In postgresql.conf, set:\nlisten_addresses = 'localhost'"}},
+  6379:{what:"Redis — a fast in-memory database often used for caching. By default Redis has NO authentication, meaning anyone who connects can read and write all your data.",fix:{risk:"warning",text:"Redis with no password is extremely dangerous if exposed publicly. Add a password in redis.conf and bind it to localhost only.",cmd:"# In redis.conf:\nbind 127.0.0.1\nrequirepass yourStrongPasswordHere"}},
+  8080:{what:"HTTP Alternative — a secondary web server port often used for development servers, admin panels, or proxy servers.",fix:{risk:"safe",text:"Check what is running on this port. If it's a dev server or admin panel, make sure it's not publicly accessible without authentication.",cmd:""}},
+  8443:{what:"HTTPS Alternative — a secondary HTTPS port. Often used for admin panels or secondary web services.",fix:{risk:"safe",text:"Same as port 8080 — verify what service is running here and ensure it requires authentication.",cmd:""}},
+  27017:{what:"MongoDB — a popular NoSQL database. In 2017, thousands of MongoDB databases were wiped and held for ransom because they were left open to the internet with no password.",fix:{risk:"warning",text:"MongoDB must never be publicly accessible. Bind it to localhost and always enable authentication.",cmd:"# In mongod.conf:\nnet:\n  bindIp: 127.0.0.1\nsecurity:\n  authorization: enabled"}},
+};
+
+const DEFAULT_INFO={what:"This port is open and accepting connections. Click a well-known port for detailed security information.",fix:{risk:"safe",text:"Research what service is running on this port and whether it needs to be publicly accessible.",cmd:""}};
+
+let lastResults=[];
+let lastHost='';
+
+document.querySelectorAll('.preset-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const v=btn.dataset.ports;
+    document.getElementById('portInput').value=PORT_PRESETS[v]||'';
+    if(v==='custom')document.getElementById('portInput').focus();
+  });
+});
+document.getElementById('timeout').addEventListener('input',e=>{document.getElementById('timeoutVal').textContent=parseFloat(e.target.value).toFixed(1)+'s';});
+document.getElementById('threads').addEventListener('input',e=>{document.getElementById('threadsVal').textContent=e.target.value;});
+
+function getRisk(port){
+  if(DANGER_PORTS.includes(port))return'danger';
+  if(WARNING_PORTS.includes(port))return'warning';
+  return'safe';
+}
+
+function parsePorts(str){
+  const ports=new Set();
+  for(const part of str.split(',')){
+    const t=part.trim();
+    if(!t)continue;
+    if(t.includes('-')){const[a,b]=t.split('-').map(Number);for(let i=a;i<=Math.min(b,65535);i++)ports.add(i);}
+    else{const n=parseInt(t);if(n>0&&n<=65535)ports.add(n);}
+  }
+  return[...ports].sort((a,b)=>a-b);
+}
+
+function setStatus(state,text){
+  const dot=document.getElementById('statusDot');
+  dot.className='status-dot'+(state?' '+state:'');
+  document.getElementById('statusText').textContent=text;
+}
+
+function showInfo(port,service){
+  const info=PORT_INFO[port]||DEFAULT_INFO;
+  const risk=getRisk(port);
+  document.getElementById('infoPort').textContent='Port '+port;
+  document.getElementById('infoService').textContent=service;
+  document.getElementById('infoWhat').textContent=info.what;
+  const fixRisk=info.fix.risk;
+  const fixLabel={'danger':'🔴 Dangerous — Action Required','warning':'🟡 Caution — Review Recommended','safe':'🟢 Safe — No Action Needed'}[fixRisk];
+  document.getElementById('infoFix').innerHTML=`
+    <div class="info-fix-label ${fixRisk}">${fixLabel}</div>
+    <p>${info.fix.text}</p>
+    ${info.fix.cmd?`<code>${info.fix.cmd}</code>`:''}
+  `;
+  document.getElementById('infoPanel').classList.add('visible');
+}
+
+function closeInfo(){
+  document.getElementById('infoPanel').classList.remove('visible');
+}
+
+function exportCSV(){
+  if(!lastResults.length)return;
+  const rows=[['Port','State','Service','Banner','Risk']];
+  lastResults.forEach(r=>rows.push([r.port,'open',r.service,r.banner||'',getRisk(r.port)]));
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`scan_${lastHost}_${Date.now()}.csv`;
+  a.click();
+}
+
+let scanning=false;
+function startScan(){
+  if(scanning)return;
+  const host=document.getElementById('host').value.trim();
+  if(!host){alert('Please enter a hostname or IP.');return;}
+  const ports=parsePorts(document.getElementById('portInput').value.trim());
+  if(ports.length===0){alert('No valid ports.');return;}
+  const timeout=parseFloat(document.getElementById('timeout').value);
+  const threads=parseInt(document.getElementById('threads').value);
+  const banners=document.getElementById('banners').checked;
+  scanning=true;
+  lastResults=[];
+  lastHost=host;
+  closeInfo();
+  document.getElementById('scanBtn').textContent='⏳ Scanning…';
+  document.getElementById('scanBtn').disabled=true;
+  document.getElementById('summaryCards').style.display='none';
+  document.getElementById('statPills').innerHTML='';
+  document.getElementById('exportBtn').style.display='none';
+  setStatus('scanning',`Scanning ${host} — ${ports.length} ports…`);
+  document.getElementById('tableWrap').innerHTML=`
+    <div style="padding:1.5rem 0 1rem;">
+      <div class="progress-bar-wrap"><div class="progress-bar" id="pbar" style="width:30%"></div></div>
+    </div>
+    <div id="logArea" style="max-height:200px;overflow-y:auto;margin-bottom:1rem;"></div>
+    <div id="tableArea"></div>`;
+  const startTime=Date.now();
+  fetch('http://127.0.0.1:5000/scan',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({host,ports,timeout,banners,threads})
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    const elapsed=((Date.now()-startTime)/1000).toFixed(2);
+    document.getElementById('pbar').style.width='100%';
+    if(data.error){setStatus('error',data.error);scanning=false;document.getElementById('scanBtn').textContent='▶ Start scan';document.getElementById('scanBtn').disabled=false;return;}
+    lastResults=data.results;
+    const logArea=document.getElementById('logArea');
+    if(data.results.length>0){
+      const ta=document.getElementById('tableArea');
+      ta.innerHTML='<table><thead><tr><th>Port</th><th>Risk</th><th>Service</th><th>Proto</th><th>Banner</th><th></th></tr></thead><tbody id="tbody"></tbody></table>';
+      data.results.forEach(r=>{
+        const risk=getRisk(r.port);
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td class="td-port">${r.port}</td><td><span class="td-${risk}">${risk}</span></td><td class="td-service">${r.service}</td><td><span class="td-proto">TCP</span></td><td class="td-banner">${r.banner||'—'}</td><td class="td-hint">ℹ click for info</td>`;
+        tr.addEventListener('click',()=>showInfo(r.port,r.service));
+        document.getElementById('tbody').appendChild(tr);
+        const line=document.createElement('div');
+        line.className=`log-line ${risk}`;
+        line.textContent=`[+] ${r.port}/TCP  ${risk.toUpperCase()}  ${r.service}${r.banner?' — '+r.banner:''}`;
+        logArea.appendChild(line);
+      });
+    } else {
+      document.getElementById('tableArea').innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted);font-size:13px;">No open ports found.</div>';
+    }
+    scanning=false;
+    document.getElementById('scanBtn').textContent='▶ Start scan';
+    document.getElementById('scanBtn').disabled=false;
+    setStatus('done',`Scan complete — ${ports.length} ports in ${elapsed}s`);
+    document.getElementById('sc-open').textContent=data.results.length;
+    document.getElementById('sc-total').textContent=ports.length;
+    document.getElementById('sc-time').textContent=elapsed;
+    document.getElementById('sc-ip').textContent=data.ip;
+    document.getElementById('summaryCards').style.display='grid';
+    document.getElementById('statPills').innerHTML=`<span class="pill open">${data.results.length} open</span><span class="pill">${ports.length} scanned</span>`;
+    if(data.results.length>0)document.getElementById('exportBtn').style.display='block';
+  })
+  .catch(()=>{
+    scanning=false;
+    document.getElementById('scanBtn').textContent='▶ Start scan';
+    document.getElementById('scanBtn').disabled=false;
+    setStatus('error','Cannot connect to server — make sure server.py is running');
+    document.getElementById('tableWrap').innerHTML='<div style="padding:2rem;text-align:center;color:var(--red);font-family:var(--mono);font-size:13px;">Could not connect to the scanner server.<br><br>Make sure server.py is running in your terminal.</div>';
+  });
+}
+</script>
+</body>
+</html>
